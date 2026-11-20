@@ -156,10 +156,14 @@ function readPiStatusConfig(): PiStatusConfig {
 }
 
 function writePiStatusConfig(config: PiStatusConfig): void {
-  const { project } = getSettingsPaths();
-  // Prefer project settings if they exist, otherwise write to global.
-  // If neither exists, create global.
-  const targetPath = existsSync(project) ? project : getSettingsPaths().global;
+  const { project, global } = getSettingsPaths();
+  // Global unless this project already has its own piStatus block: a project
+  // override is something the user put there on purpose (and, being read over
+  // the global block, would otherwise hide every change). A project that
+  // merely has a settings.json for other things never gets title config
+  // written into it.
+  const projectSettings = loadJsonSafe(project);
+  const targetPath = projectSettings && "piStatus" in projectSettings ? project : global;
   const existing = loadJsonSafe(targetPath) ?? {};
   existing["piStatus"] = config as unknown as Record<string, unknown>;
   writeFileSync(targetPath, JSON.stringify(existing, null, 2) + "\n", "utf-8");
