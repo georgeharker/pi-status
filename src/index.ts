@@ -1,5 +1,5 @@
 import path from "node:path";
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { Container, Text, matchesKey, Key } from "@earendil-works/pi-tui";
@@ -100,15 +100,22 @@ const DEFAULT_CONFIG: PiStatusConfig = {
 };
 
 // ---------------------------------------------------------------------------
-// Config persistence: read / write pi settings.json
+// Config persistence: pi-status.json, its own file in pi's agent dir
 // ---------------------------------------------------------------------------
+//
+// The config lives in <agent dir>/pi-status.json (pi's getAgentDir:
+// PI_CODING_AGENT_DIR, else ~/.pi/agent), the only file /pi-status writes.
+// A project's .pi/pi-status.json, if present, is read instead (a per-project
+// override, never written). Earlier versions kept the config under a
+// "piStatus" key in pi's settings.json (project, else global). With no
+// pi-status.json yet, such a block is migrated: copied to pi-status.json on
+// first load. pi's settings.json is left as it is (the old block is ignored
+// from then on and can be deleted).
 
-// Global settings live in pi's agent dir (PI_CODING_AGENT_DIR, else
-// ~/.pi/agent), which pi's own getAgentDir resolves.
-function getSettingsPaths(): { global: string; project: string } {
+function getConfigPaths(): { global: string; project: string } {
   return {
-    global: path.join(getAgentDir(), "settings.json"),
-    project: path.join(process.cwd(), ".pi", "settings.json"),
+    global: path.join(getAgentDir(), "pi-status.json"),
+    project: path.join(process.cwd(), ".pi", "pi-status.json"),
   };
 }
 
@@ -121,17 +128,32 @@ function loadJsonSafe(filePath: string): Record<string, unknown> | null {
   }
 }
 
-function readMergedSettings(): Record<string, unknown> {
-  const { global, project } = getSettingsPaths();
-  const globalSettings = loadJsonSafe(global) ?? {};
-  const projectSettings = loadJsonSafe(project) ?? {};
-  // shallow merge: project overrides global
-  return { ...globalSettings, ...projectSettings };
+/** The stored config object: the project file, else the global file, else
+ *  the legacy piStatus block in pi's settings (project, then global), which
+ *  is then migrated to the global pi-status.json. */
+function readStoredConfig(): PiStatusConfig | undefined {
+  const { global, project } = getConfigPaths();
+  const own = loadJsonSafe(project) ?? loadJsonSafe(global);
+  if (own) return own as unknown as PiStatusConfig;
+  for (const settings of [
+    path.join(process.cwd(), ".pi", "settings.json"),
+    path.join(getAgentDir(), "settings.json"),
+  ]) {
+    const legacy = loadJsonSafe(settings)?.["piStatus"];
+    if (legacy && typeof legacy === "object") {
+      try {
+        writePiStatusConfig(legacy as PiStatusConfig);
+      } catch {
+        /* read-only agent dir: keep reading the legacy block */
+      }
+      return legacy as PiStatusConfig;
+    }
+  }
+  return undefined;
 }
 
 function readPiStatusConfig(): PiStatusConfig {
-  const settings = readMergedSettings();
-  const raw = settings["piStatus"] as PiStatusConfig | undefined;
+  const raw = readStoredConfig();
   if (!raw || typeof raw !== "object") return structuredClone(DEFAULT_CONFIG);
 
   const separator = typeof raw.separator === "string" ? raw.separator : DEFAULT_CONFIG.separator;
@@ -156,17 +178,9 @@ function readPiStatusConfig(): PiStatusConfig {
 }
 
 function writePiStatusConfig(config: PiStatusConfig): void {
-  const { project, global } = getSettingsPaths();
-  // Global unless this project already has its own piStatus block: a project
-  // override is something the user put there on purpose (and, being read over
-  // the global block, would otherwise hide every change). A project that
-  // merely has a settings.json for other things never gets title config
-  // written into it.
-  const projectSettings = loadJsonSafe(project);
-  const targetPath = projectSettings && "piStatus" in projectSettings ? project : global;
-  const existing = loadJsonSafe(targetPath) ?? {};
-  existing["piStatus"] = config as unknown as Record<string, unknown>;
-  writeFileSync(targetPath, JSON.stringify(existing, null, 2) + "\n", "utf-8");
+  const { global } = getConfigPaths();
+  mkdirSync(path.dirname(global), { recursive: true });
+  writeFileSync(global, JSON.stringify(config, null, 2) + "\n", "utf-8");
 }
 
 function isDisabledByEnv(): boolean {

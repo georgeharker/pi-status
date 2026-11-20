@@ -101,32 +101,32 @@ Works in Ghostty 1.2+ and any libghostty-based terminals. Enabled **by default**
 
 ## Configuration
 
-Settings are stored in pi's settings files under the `piStatus` key:
+Settings are stored in their own file, `pi-status.json`, in pi's agent dir:
 
-- `~/.pi/agent/settings.json` (global)
-- `.pi/settings.json` (project-local, overrides global)
+- `~/.pi/agent/pi-status.json` (global; in `$PI_CODING_AGENT_DIR` when that is set). This is the only file `/pi-status` writes.
+- `.pi/pi-status.json` (project-local, read instead of the global file; never written)
+
+Versions before this one kept the config under a `piStatus` key in pi's `settings.json` (the project's if it had one, else the global one). When there is no `pi-status.json` yet, that block is migrated: copied to the global `pi-status.json` the first time pi-status loads. pi's `settings.json` is left as it is; the old block is ignored from then on and can be deleted.
 
 Example with custom separator and additional components:
 
 ```json
 {
-  "piStatus": {
-    "separator": " | ",
-    "ghosttySupport": true,
-    "components": [
-      { "id": "spinner", "enabled": true },
-      { "id": "pi_symbol", "enabled": true },
-      { "id": "model", "enabled": true },
-      { "id": "session", "enabled": true },
-      { "id": "cwd", "enabled": true },
-      { "id": "thinking", "enabled": true },
-      { "id": "git_branch", "enabled": true },
-      { "id": "tokens", "enabled": false },
-      { "id": "turn", "enabled": false },
-      { "id": "tools_count", "enabled": false },
-      { "id": "current_tool", "enabled": false }
-    ]
-  }
+  "separator": " | ",
+  "ghosttySupport": true,
+  "components": [
+    { "id": "spinner", "enabled": true },
+    { "id": "pi_symbol", "enabled": true },
+    { "id": "model", "enabled": true },
+    { "id": "session", "enabled": true },
+    { "id": "cwd", "enabled": true },
+    { "id": "thinking", "enabled": true },
+    { "id": "git_branch", "enabled": true },
+    { "id": "tokens", "enabled": false },
+    { "id": "turn", "enabled": false },
+    { "id": "tools_count", "enabled": false },
+    { "id": "current_tool", "enabled": false }
+  ]
 }
 ```
 
