@@ -1,11 +1,32 @@
 /**
- * The /pi-status menus: the main menu and the component picker. Both are a
- * cursor over a list of rows (runList); they reach the extension only through
- * MenuDeps.
+ * The /pi-status menus, built on pi's own settings components: a
+ * SettingsList (as in pi's /settings) for the main menu, with submenus for
+ * the components, the separator and reset. They reach the extension only
+ * through MenuDeps.
  */
-import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { Container, Key, Text, matchesKey } from "@earendil-works/pi-tui";
-import { COMPONENT_LABELS, DISABLE_ENV, type ComponentConfig } from "./config.js";
+import {
+  getSelectListTheme,
+  getSettingsListTheme,
+  type ExtensionCommandContext,
+} from "@earendil-works/pi-coding-agent";
+import {
+  Container,
+  Input,
+  Key,
+  SelectList,
+  SettingsList,
+  Text,
+  matchesKey,
+  type Component,
+  type SettingItem,
+} from "@earendil-works/pi-tui";
+import {
+  COMPONENT_LABELS,
+  DISABLE_ENV,
+  MAX_SEPARATOR_LENGTH,
+  type ComponentConfig,
+  type ComponentId,
+} from "./config.js";
 
 type Theme = Parameters<Parameters<ExtensionCommandContext["ui"]["custom"]>[0]>[1];
 
@@ -18,145 +39,190 @@ export interface MenuDeps {
   applyComponents(components: ComponentConfig[]): void;
   /** Save these components and show them. */
   saveComponents(components: ComponentConfig[]): void;
+  separator(): string;
+  /** Save and show a separator. */
+  setSeparator(separator: string): void;
+  /** Restore and save the default config. */
+  reset(): void;
   enabled(): boolean;
   /** Whether PI_STATUS_DISABLED turned pi-status off. */
   disabledByEnv(): boolean;
   setEnabled(enabled: boolean): void;
 }
 
-interface ListView<R> {
-  /** Lines above the list. */
-  header?(theme: Theme): string[];
-  /** One line per row; `selected` is the row under the cursor. */
-  rows(theme: Theme, cursor: number): string[];
-  /** Lines below the list. */
-  footer?(theme: Theme): string[];
-  /** A key the list does not handle itself (it handles up and down).
-   *  Return a result to close the menu with it, "redraw" to redraw, or
-   *  nothing to ignore the key. */
-  onKey(data: string, cursor: number): { close: R | undefined } | "redraw" | undefined;
-  /** Cursor moves (to keep it valid when rows move). */
-  setCursor?(cursor: number): number;
+const ON = "enabled";
+const OFF = "disabled";
+
+/** The id of the row under a SettingsList's cursor. SettingsList offers
+ *  selectItem(id) to move the cursor but no way to read it, which
+ *  reordering needs; this reads its private state, and gives undefined
+ *  (reordering is then skipped) if that ever changes shape. */
+function selectedId(list: SettingsList): string | undefined {
+  // SAFETY: reads SettingsList's private selectedIndex and items (pi-tui
+  // 1.5). Both are checked before use, so a different shape yields
+  // undefined rather than a wrong row.
+  const internal = list as unknown as { selectedIndex?: unknown; items?: SettingItem[] };
+  return typeof internal.selectedIndex === "number" ? internal.items?.[internal.selectedIndex]?.id : undefined;
 }
 
-/** A keyboard-driven list: ↑/↓ move the cursor, the view handles the rest. */
-function runList<R>(ctx: ExtensionCommandContext, view: ListView<R>): Promise<R | undefined> {
-  return ctx.ui.custom<R | undefined>((tui, theme, _kb, done) => {
-    const container = new Container();
-    let cursor = 0;
-    const count = () => view.rows(theme, cursor).length;
-    const line = (text: string) => container.addChild(new Text(text, 1, 0));
-    const redraw = () => {
-      container.clear();
-      for (const l of view.header?.(theme) ?? []) line(l);
-      for (const l of view.rows(theme, cursor)) line(l);
-      for (const l of view.footer?.(theme) ?? []) line(l);
-      tui.requestRender();
-    };
-    redraw();
-    return {
-      render: (w: number) => container.render(w),
-      invalidate: () => container.invalidate(),
-      handleInput: (data: string) => {
-        if (matchesKey(data, Key.up) || matchesKey(data, Key.down)) {
-          const next = matchesKey(data, Key.up) ? cursor - 1 : cursor + 1;
-          cursor = Math.min(Math.max(next, 0), count() - 1);
-          redraw();
-          return;
-        }
-        const result = view.onKey(data, cursor);
-        if (result === "redraw") {
-          cursor = view.setCursor?.(cursor) ?? cursor;
-          redraw();
-        } else if (result) done(result.close);
-      },
-    };
-  });
-}
-
-/** The component picker: Space toggles, Ctrl+↑/↓ reorders, with a live
- *  preview; Enter or Esc saves. */
-export async function editComponents(ctx: ExtensionCommandContext, deps: MenuDeps): Promise<void> {
+/** The component picker: Space/Enter toggles, Ctrl+↑/↓ reorders, a live
+ *  preview above; Esc saves and closes. */
+function componentPicker(theme: Theme, deps: MenuDeps, onClose: () => void): Component {
   const comps = deps.components().map((c) => ({ ...c }));
-  const labelWidth = Math.max(...comps.map((c) => COMPONENT_LABELS[c.id].length));
-  let moveTo: number | null = null;
-  const swap = (a: number, b: number) => {
-    [comps[a], comps[b]] = [comps[b]!, comps[a]!];
-    moveTo = b;
+  const items: SettingItem[] = comps.map((c) => ({
+    id: c.id,
+    label: COMPONENT_LABELS[c.id],
+    currentValue: c.enabled ? ON : OFF,
+    values: [ON, OFF],
+  }));
+  const preview = new Text("", 1, 0);
+  const showPreview = () =>
+    preview.setText(theme.fg("dim", "Preview: ") + theme.fg("accent", theme.bold(deps.preview(comps) || "(empty)")));
+  const close = () => {
+    deps.saveComponents(comps);
+    onClose();
+  };
+  const list = new SettingsList(
+    items,
+    Math.min(items.length + 2, 15),
+    getSettingsListTheme(),
+    (id, value) => {
+      const c = comps.find((x) => x.id === id);
+      if (c) c.enabled = value === ON;
+      deps.applyComponents(comps);
+      showPreview();
+    },
+    close,
+  );
+  showPreview();
+  const container = new Container();
+  container.addChild(preview);
+  container.addChild(list);
+  container.addChild(new Text(theme.fg("dim", "Ctrl+↑/↓ reorder"), 1, 0));
+
+  const move = (by: -1 | 1): void => {
+    const id = selectedId(list);
+    const from = comps.findIndex((c) => c.id === id);
+    const to = from + by;
+    if (from < 0 || to < 0 || to >= comps.length) return;
+    [comps[from], comps[to]] = [comps[to]!, comps[from]!];
+    [items[from], items[to]] = [items[to]!, items[from]!];
+    list.selectItem(id as ComponentId);
+    deps.applyComponents(comps);
+    showPreview();
+    list.invalidate();
   };
 
-  await runList<true>(ctx, {
-    header: (theme) => [
-      theme.fg("dim", "Preview: ") + theme.fg("accent", theme.bold(deps.preview(comps) || "(empty)")),
-    ],
-    rows: (theme, cursor) =>
-      comps.map((c, i) => {
-        const text = `${i === cursor ? "›" : " "} [${c.enabled ? "✓" : " "}] ${COMPONENT_LABELS[c.id].padEnd(labelWidth)}`;
-        return i === cursor ? theme.fg("accent", text) : text;
-      }),
-    footer: (theme) => [theme.fg("dim", "↑↓ move   Space toggle   Ctrl+↑/↓ reorder   Enter/Esc done")],
-    onKey: (data, cursor) => {
-      if (matchesKey(data, Key.space)) {
-        comps[cursor]!.enabled = !comps[cursor]!.enabled;
-      } else if (matchesKey(data, Key.ctrl("up")) && cursor > 0) {
-        swap(cursor, cursor - 1);
-      } else if (matchesKey(data, Key.ctrl("down")) && cursor < comps.length - 1) {
-        swap(cursor, cursor + 1);
-      } else if (matchesKey(data, Key.escape) || matchesKey(data, Key.enter)) {
-        return { close: true };
-      } else {
-        return undefined;
-      }
-      deps.applyComponents(comps);
-      return "redraw";
+  return {
+    render: (w: number) => container.render(w),
+    invalidate: () => container.invalidate(),
+    handleInput: (data: string) => {
+      if (matchesKey(data, Key.ctrl("up"))) return move(-1);
+      if (matchesKey(data, Key.ctrl("down"))) return move(1);
+      list.handleInput(data);
     },
-    setCursor: (cursor) => {
-      const next = moveTo ?? cursor;
-      moveTo = null;
-      return next;
-    },
-  });
-
-  deps.saveComponents(comps);
-  ctx.ui.notify("Component settings updated", "info");
+  };
 }
 
-export type MainMenuAction = "components" | "separator" | "reset";
+/** A single-line Input submenu for the separator. */
+function separatorInput(theme: Theme, deps: MenuDeps, done: (value?: string) => void): Component {
+  const error = new Text("", 1, 0);
+  // Not prefilled: Input has no way to put its cursor at the end of a set
+  // value. The current separator is the placeholder; Enter on an empty
+  // field keeps it.
+  const input = new Input({ placeholder: `${JSON.stringify(deps.separator())} (current)` });
+  input.focused = true;
+  input.onSubmit = (value) => {
+    if (value.length > MAX_SEPARATOR_LENGTH) {
+      error.setText(theme.fg("error", `At most ${MAX_SEPARATOR_LENGTH} characters, e.g. '|', '·', ' - '`));
+      return;
+    }
+    if (value) deps.setSeparator(value);
+    done(JSON.stringify(deps.separator()));
+  };
+  input.onEscape = () => done();
+  const container = new Container();
+  container.addChild(new Text(theme.fg("dim", "New separator (Enter to save, Esc to cancel):"), 1, 0));
+  container.addChild(input);
+  container.addChild(error);
+  return {
+    render: (w: number) => container.render(w),
+    invalidate: () => container.invalidate(),
+    handleInput: (data: string) => input.handleInput(data),
+  };
+}
 
-/** The main menu. Toggling status happens in place; the other entries close
- *  it and return their action. */
-export async function showMainMenu(
-  ctx: ExtensionCommandContext,
-  deps: MenuDeps,
-): Promise<MainMenuAction | undefined> {
-  const items: Array<{ label: (theme: Theme) => string; action: MainMenuAction | "toggle" | "close" }> = [
-    {
-      label: (theme) => {
-        if (!deps.enabled() && deps.disabledByEnv()) {
-          return "Status: " + theme.fg("warning", "disabled") + theme.fg("dim", ` by ${DISABLE_ENV}`);
-        }
-        return "Status: " + (deps.enabled() ? theme.fg("success", "enabled") : theme.fg("warning", "disabled"));
+const enabledCount = (deps: MenuDeps) => `${deps.components().filter((c) => c.enabled).length} on`;
+const statusValue = (deps: MenuDeps) => (deps.enabled() ? ON : deps.disabledByEnv() ? `${OFF} (${DISABLE_ENV})` : OFF);
+
+/** /pi-status: status, components, separator and reset in one settings list. */
+export async function showSettings(ctx: ExtensionCommandContext, deps: MenuDeps): Promise<void> {
+  await ctx.ui.custom<void>((_tui, theme, _kb, done) => {
+    const items: SettingItem[] = [
+      {
+        id: "status",
+        label: "Status",
+        description: "Whether pi-status sets the terminal title",
+        currentValue: statusValue(deps),
+        values: [ON, OFF],
       },
-      action: "toggle",
-    },
-    { label: () => "Change components", action: "components" },
-    { label: () => "Change separator", action: "separator" },
-    { label: () => "Reset to defaults", action: "reset" },
-    { label: () => "Close", action: "close" },
-  ];
-
-  const chosen = await runList<MainMenuAction | "close">(ctx, {
-    header: () => ["pi-status:", ""],
-    rows: (theme, cursor) =>
-      items.map((item, i) => `  ${i === cursor ? theme.fg("accent", "›") : " "} ${item.label(theme)}`),
-    onKey: (data, cursor) => {
-      if (matchesKey(data, Key.escape)) return { close: "close" };
-      if (!matchesKey(data, Key.space) && !matchesKey(data, Key.enter)) return undefined;
-      const item = items[cursor]!;
-      if (item.action !== "toggle") return { close: item.action };
-      deps.setEnabled(!deps.enabled());
-      return "redraw";
-    },
+      {
+        id: "components",
+        label: "Components",
+        description: "What the title shows, and in which order",
+        currentValue: enabledCount(deps),
+        submenu: (_value, close) => componentPicker(theme, deps, () => close(enabledCount(deps))),
+      },
+      {
+        id: "separator",
+        label: "Separator",
+        description: "Placed between the components",
+        currentValue: JSON.stringify(deps.separator()),
+        submenu: (_value, close) => separatorInput(theme, deps, close),
+      },
+      {
+        id: "reset",
+        label: "Reset to defaults",
+        description: "Restore the default components and separator",
+        currentValue: "",
+        submenu: (_value, close) => {
+          const confirm = new SelectList(
+            [
+              { value: "reset", label: "Reset to defaults" },
+              { value: "cancel", label: "Cancel" },
+            ],
+            2,
+            getSelectListTheme(),
+          );
+          confirm.onSelect = (item) => {
+            if (item.value === "reset") {
+              deps.reset();
+              list.updateValue("status", statusValue(deps));
+              list.updateValue("components", enabledCount(deps));
+              list.updateValue("separator", JSON.stringify(deps.separator()));
+            }
+            close();
+          };
+          confirm.onCancel = () => close();
+          return confirm;
+        },
+      },
+    ];
+    const list = new SettingsList(
+      items,
+      items.length + 2,
+      getSettingsListTheme(),
+      (id, value) => {
+        if (id === "status") deps.setEnabled(value === ON);
+      },
+      () => done(),
+    );
+    return list;
   });
-  return chosen === "close" ? undefined : chosen;
+}
+
+/** /pi-status components: the picker on its own. */
+export async function editComponents(ctx: ExtensionCommandContext, deps: MenuDeps): Promise<void> {
+  await ctx.ui.custom<void>((_tui, theme, _kb, done) => componentPicker(theme, deps, () => done()));
+  ctx.ui.notify("Component settings updated", "info");
 }

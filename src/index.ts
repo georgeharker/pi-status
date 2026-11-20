@@ -17,7 +17,7 @@ import {
   type PiStatusConfig,
 } from "./config.js";
 import { EMPTY_SNAPSHOT, buildTitle, type TitleSnapshot } from "./title.js";
-import { editComponents, showMainMenu, type MenuDeps } from "./menu.js";
+import { editComponents, showSettings, type MenuDeps } from "./menu.js";
 
 export default function piStatus(pi: ExtensionAPI) {
   let config: PiStatusConfig = loadConfig();
@@ -174,6 +174,17 @@ export default function piStatus(pi: ExtensionAPI) {
       saveConfig(config);
       refresh(ctx);
     },
+    separator: () => config.separator,
+    setSeparator: (separator) => {
+      config = { ...config, separator };
+      saveConfig(config);
+      refresh(ctx);
+    },
+    reset: () => {
+      config = structuredClone(DEFAULT_CONFIG);
+      saveConfig(config);
+      setEnabled(ctx, !isDisabledByEnv());
+    },
     enabled: () => enabled,
     disabledByEnv: () => isDisabledByEnv(),
     setEnabled: (on) => setEnabled(ctx, on),
@@ -195,9 +206,7 @@ export default function piStatus(pi: ExtensionAPI) {
       );
       return;
     }
-    config = { ...config, separator: entered || config.separator };
-    saveConfig(config);
-    refresh(ctx);
+    if (entered) menuDeps(ctx).setSeparator(entered);
     ctx.ui.notify(`Separator changed to "${config.separator}"`, "info");
   }
 
@@ -210,9 +219,7 @@ export default function piStatus(pi: ExtensionAPI) {
       ctx.ui.notify("Reset cancelled", "warning");
       return;
     }
-    config = structuredClone(DEFAULT_CONFIG);
-    saveConfig(config);
-    setEnabled(ctx, !isDisabledByEnv());
+    menuDeps(ctx).reset();
     ctx.ui.notify("pi-status config reset to defaults", "info");
   }
 
@@ -235,13 +242,9 @@ export default function piStatus(pi: ExtensionAPI) {
           return changeSeparator(ctx);
         case "reset":
           return reset(ctx);
-        default: {
-          // Empty, "status" or unknown: the menu.
-          const action = await showMainMenu(ctx, menuDeps(ctx));
-          if (action === "components") return editComponents(ctx, menuDeps(ctx));
-          if (action === "separator") return changeSeparator(ctx);
-          if (action === "reset") return reset(ctx);
-        }
+        default:
+          // Empty, "status" or unknown: the settings.
+          return showSettings(ctx, menuDeps(ctx));
       }
     },
   });

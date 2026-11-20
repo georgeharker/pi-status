@@ -31,19 +31,20 @@ pi -e @thinkscape/pi-status
 
 ## Commands
 
-Typing `/pi-status` with no arguments opens an **interactive menu** with these actions:
+Typing `/pi-status` with no arguments opens its settings, in the same style as pi's `/settings`:
 
-- **Status: enabled/disabled** — toggle pi-status on/off inline (press Enter/Space)
-- **Change components** — open the component picker
-- **Change separator** — change the separator character
-- **Reset to defaults** — restore the default config
-- **Close** — exit the menu
+- **Status** — enabled/disabled (Enter/Space cycles it)
+- **Components** — opens the component picker
+- **Separator** — type a new separator (Enter on an empty field keeps the current one)
+- **Reset to defaults** — restore the default config, after a confirmation
+
+Esc closes a submenu, then the settings.
 
 You can also invoke subcommands directly:
 
 ```text
-/pi-status                open interactive menu
-/pi-status status         open interactive menu
+/pi-status                open the settings
+/pi-status status         open the settings
 /pi-status on             enable pi-status for this session
 /pi-status off            disable pi-status for this session
 /pi-status components     open TUI to toggle & reorder status components
@@ -55,12 +56,12 @@ You can also invoke subcommands directly:
 
 Opens an interactive picker with a **live preview** of the current title at the top. You can:
 
-- **Toggle** components on/off with `Space`
+- **Toggle** components on/off with `Enter` or `Space`
 - **Reorder** components with `Ctrl+↑` / `Ctrl+↓`
 - **Navigate** the list with `↑` / `↓`
-- **Exit** with `Enter` or `Escape`
+- **Exit** with `Escape`, which saves
 
-The order in the list determines the display order in the tab title. Changes are saved immediately.
+The order in the list determines the display order in the tab title. Changes show in the title as you make them.
 
 ### Available components
 
