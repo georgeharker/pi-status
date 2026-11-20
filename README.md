@@ -1,6 +1,8 @@
 # @thinkscape/pi-status
 
-A [pi](https://github.com/badlogic/pi-mono) extension that shows a **configurable status bar** in the terminal tab title while pi is working, then restores the title when the turn finishes. Also supports **[Ghostty](https://github.com/ghostty-org/ghostty)'s native OSC 9;4 progress bar**. Compatible with all [libghostty](https://ghostty-org-ghostty.mintlify.app/api/overview)-based terminals like [cmux](https://github.com/manaflow-ai/cmux), [muxy](https://github.com/muxy-app/muxy), etc.
+A [pi](https://github.com/badlogic/pi-mono) extension that shows a **configurable status bar** in the terminal tab title while pi is working, then restores the title when the turn finishes.
+
+For a progress indicator in the tab (OSC 9;4, e.g. in Ghostty), use pi's own setting: `"terminal": { "showTerminalProgress": true }` in pi's `settings.json`.
 
 ![Demo](assets/demo.gif)
 
@@ -32,7 +34,6 @@ pi -e @thinkscape/pi-status
 Typing `/pi-status` with no arguments opens an **interactive menu** with these actions:
 
 - **Status: enabled/disabled** — toggle pi-status on/off inline (press Enter/Space)
-- **Ghostty support: enabled/disabled** — toggle Ghostty OSC 9;4 native progress bar
 - **Change components** — open the component picker
 - **Change separator** — change the separator character
 - **Reset to defaults** — restore the default config
@@ -45,8 +46,6 @@ You can also invoke subcommands directly:
 /pi-status status         open interactive menu
 /pi-status on             enable pi-status for this session
 /pi-status off            disable pi-status for this session
-/pi-status ghostty on     enable Ghostty progress bar
-/pi-status ghostty off    disable Ghostty progress bar
 /pi-status components     open TUI to toggle & reorder status components
 /pi-status separator      change the separator character between elements
 /pi-status reset          restore default pi-status configuration
@@ -89,16 +88,6 @@ Default: `" - "`
 
 Restores all pi-status configuration to the defaults shown above.
 
-### `ghostty`
-
-Enables or disables Ghostty's native OSC 9;4 progress bar. When enabled:
-
-- **Indeterminate pulse** while the agent is working (`OSC 9;4;3`), refreshed every second like pi's built-in terminal progress
-- **Green completion flash** at 100% when the agent finishes (`OSC 9;4;1;100`)
-- **Clears on interaction** (`OSC 9;4;0`) when you press a key, focus the terminal, start another agent turn, disable Ghostty support, or shut down pi
-
-Works in Ghostty 1.2+ and any libghostty-based terminals. Enabled **by default**. The extension enables terminal focus reporting while Ghostty support is on and disables it on shutdown/reload.
-
 ## Configuration
 
 Settings are stored in their own file, `pi-status.json`, in pi's agent dir:
@@ -113,7 +102,6 @@ Example with custom separator and additional components:
 ```json
 {
   "separator": " | ",
-  "ghosttySupport": true,
   "components": [
     { "id": "spinner", "enabled": true },
     { "id": "pi_symbol", "enabled": true },
