@@ -106,7 +106,7 @@ Settings are stored in their own file, `pi-status.json`, in pi's agent dir:
 - `~/.pi/agent/pi-status.json` (global; in `$PI_CODING_AGENT_DIR` when that is set). This is the only file `/pi-status` writes.
 - `.pi/pi-status.json` (project-local, read instead of the global file; never written)
 
-Versions before this one kept the config under a `piStatus` key in pi's `settings.json` (the project's if it had one, else the global one). When there is no `pi-status.json` yet, that block is migrated: copied to the global `pi-status.json` the first time pi-status loads. pi's `settings.json` is left as it is; the old block is ignored from then on and can be deleted.
+pi's own `settings.json` is never read or written. A config from an older version (a `piStatus` key in pi's `settings.json`) can be moved by hand: its value is the contents of `pi-status.json`.
 
 Example with custom separator and additional components:
 

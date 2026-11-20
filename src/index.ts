@@ -106,11 +106,7 @@ const DEFAULT_CONFIG: PiStatusConfig = {
 // The config lives in <agent dir>/pi-status.json (pi's getAgentDir:
 // PI_CODING_AGENT_DIR, else ~/.pi/agent), the only file /pi-status writes.
 // A project's .pi/pi-status.json, if present, is read instead (a per-project
-// override, never written). Earlier versions kept the config under a
-// "piStatus" key in pi's settings.json (project, else global). With no
-// pi-status.json yet, such a block is migrated: copied to pi-status.json on
-// first load. pi's settings.json is left as it is (the old block is ignored
-// from then on and can be deleted).
+// override, never written). pi's own settings.json is never read or written.
 
 function getConfigPaths(): { global: string; project: string } {
   return {
@@ -128,28 +124,11 @@ function loadJsonSafe(filePath: string): Record<string, unknown> | null {
   }
 }
 
-/** The stored config object: the project file, else the global file, else
- *  the legacy piStatus block in pi's settings (project, then global), which
- *  is then migrated to the global pi-status.json. */
+/** The stored config object: the project file, else the global file. */
 function readStoredConfig(): PiStatusConfig | undefined {
   const { global, project } = getConfigPaths();
   const own = loadJsonSafe(project) ?? loadJsonSafe(global);
-  if (own) return own as unknown as PiStatusConfig;
-  for (const settings of [
-    path.join(process.cwd(), ".pi", "settings.json"),
-    path.join(getAgentDir(), "settings.json"),
-  ]) {
-    const legacy = loadJsonSafe(settings)?.["piStatus"];
-    if (legacy && typeof legacy === "object") {
-      try {
-        writePiStatusConfig(legacy as PiStatusConfig);
-      } catch {
-        /* read-only agent dir: keep reading the legacy block */
-      }
-      return legacy as PiStatusConfig;
-    }
-  }
-  return undefined;
+  return own ? (own as unknown as PiStatusConfig) : undefined;
 }
 
 function readPiStatusConfig(): PiStatusConfig {
