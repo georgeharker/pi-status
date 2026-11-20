@@ -1,6 +1,6 @@
 # @thinkscape/pi-status
 
-A [pi](https://github.com/badlogic/pi-mono) extension that shows a **configurable status bar** in the terminal tab title while pi is working, then restores the title when the turn finishes.
+A [pi](https://github.com/badlogic/pi-mono) extension that sets the terminal tab title from **configurable components** (session name, folder, model, git branch, current tool, …), with a spinner while the agent works.
 
 For a progress indicator in the tab (OSC 9;4, e.g. in Ghostty), use pi's own setting: `"terminal": { "showTerminalProgress": true }` in pi's `settings.json`.
 

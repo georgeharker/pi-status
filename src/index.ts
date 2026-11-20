@@ -725,7 +725,7 @@ export default function piStatus(pi: ExtensionAPI) {
 
   pi.registerCommand("pi-status", {
     description:
-      "Control the tab title spinner. Subcommands: on, off, components, separator, reset. " +
+      "Configure the terminal title. Subcommands: on, off, components, separator, reset. " +
       "No argument shows a menu.",
     handler: async (args, ctx) => {
       if (state.destroyed) return;
