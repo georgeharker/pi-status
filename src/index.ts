@@ -22,11 +22,8 @@ type RuntimeState = {
   enabled: boolean;
   running: boolean;
   destroyed: boolean;
-  /** The spinner tick while the agent works. */
-  timer: ReturnType<typeof setInterval> | undefined;
   /** A pending re-apply of the title on the next tick (see reapplySoon). */
   reapplyTimer: ReturnType<typeof setTimeout> | undefined;
-  frameIndex: number;
   turnIndex: number;
   modelName: string;
   thinkingLevel: string;
@@ -39,12 +36,9 @@ type RuntimeState = {
 // Defaults
 // ---------------------------------------------------------------------------
 
-const SPINNER_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
-const DEFAULT_INTERVAL_MS = 80;
 const DISABLE_ENV = "PI_STATUS_DISABLED";
 
 const ALL_COMPONENT_IDS = [
-  "spinner",
   "pi_symbol",
   "session",
   "cwd",
@@ -60,7 +54,6 @@ const ALL_COMPONENT_IDS = [
 type ComponentId = (typeof ALL_COMPONENT_IDS)[number];
 
 const COMPONENT_LABELS: Record<ComponentId, string> = {
-  spinner: "Spinner (progress icon)",
   pi_symbol: "π symbol",
   session: "Session name",
   cwd: "Working directory",
@@ -76,7 +69,6 @@ const COMPONENT_LABELS: Record<ComponentId, string> = {
 const DEFAULT_CONFIG: PiStatusConfig = {
   separator: " - ",
   components: [
-    { id: "spinner", enabled: true },
     { id: "pi_symbol", enabled: true },
     { id: "session", enabled: true },
     { id: "cwd", enabled: true },
@@ -169,10 +161,6 @@ function resolveComponentValue(
   ctx: ExtensionContext,
 ): string {
   switch (id) {
-    case "spinner": {
-      if (!state.running) return "";
-      return SPINNER_FRAMES[state.frameIndex % SPINNER_FRAMES.length] ?? SPINNER_FRAMES[0]!;
-    }
     case "pi_symbol":
       return "π";
     case "session": {
@@ -260,9 +248,7 @@ export default function piStatus(pi: ExtensionAPI) {
     enabled: !isDisabledByEnv(),
     running: false,
     destroyed: false,
-    timer: undefined,
     reapplyTimer: undefined,
-    frameIndex: 0,
     turnIndex: 0,
     modelName: "",
     thinkingLevel: "",
@@ -296,33 +282,25 @@ export default function piStatus(pi: ExtensionAPI) {
   }
 
   function clearTimers(): void {
-    if (state.timer) clearInterval(state.timer);
     if (state.reapplyTimer) clearTimeout(state.reapplyTimer);
-    state.timer = undefined;
     state.reapplyTimer = undefined;
   }
 
-  /** Start the spinner (the agent is working). */
+  /** The agent started working. The title is rewritten only when something
+   *  in it changes (a turn, a tool); busy state is pi's own terminal
+   *  progress (terminal.showTerminalProgress). */
   function start(ctx: ExtensionContext): void {
     clearTimers();
     state.running = true;
-    state.frameIndex = 0;
     state.currentTool = "";
     state.turnIndex = 1;
-    if (!live(ctx)) return;
-    const tick = () => {
-      refresh(ctx);
-      state.frameIndex++;
-    };
-    tick();
-    state.timer = setInterval(tick, DEFAULT_INTERVAL_MS);
+    refresh(ctx);
   }
 
-  /** Stop the spinner (the agent is idle) and show the idle title. */
+  /** The agent is idle: show the idle title. */
   function stop(ctx: ExtensionContext): void {
     clearTimers();
     state.running = false;
-    state.frameIndex = 0;
     state.currentTool = "";
     refresh(ctx);
     reapplySoon(ctx);
@@ -434,30 +412,13 @@ export default function piStatus(pi: ExtensionAPI) {
 
     await ctx.ui.custom((tui, theme, _kb, done) => {
       let cursor = 0;
-      let previewFrame = 0;
       const container = new Container();
-
-      const animTimer = setInterval(() => {
-        previewFrame++;
-        rebuild();
-      }, DEFAULT_INTERVAL_MS);
-
-      function cleanup() {
-        clearInterval(animTimer);
-      }
 
       function titlePreview(): string {
         const parts: string[] = [];
         for (const c of comps) {
           if (!c.enabled) continue;
-          let val: string;
-          if (c.id === "spinner") {
-            val =
-              SPINNER_FRAMES[previewFrame % SPINNER_FRAMES.length] ??
-              SPINNER_FRAMES[0]!;
-          } else {
-            val = resolveComponentValue(c.id as ComponentId, state, pi, ctx);
-          }
+          const val = resolveComponentValue(c.id as ComponentId, state, pi, ctx);
           if (val) parts.push(val);
         }
         const joined = parts.join(config.separator);
@@ -573,7 +534,6 @@ export default function piStatus(pi: ExtensionAPI) {
             matchesKey(data, Key.escape) ||
             matchesKey(data, Key.enter)
           ) {
-            cleanup();
             persist();
             done(undefined);
             return;

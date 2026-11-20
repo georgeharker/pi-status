@@ -82,18 +82,29 @@ describe("title", () => {
     expect(h.titles.at(-1)).toBe("π - my-session - my-project");
   });
 
-  test("the spinner runs while the agent works and stops at agent_end", async () => {
+  test("no timers while the agent works: the title changes only when its content does", async () => {
     const h = harness();
     await h.emit("session_start");
+    await tick();
     await h.emit("agent_start");
-    expect(h.titles.at(-1)).toMatch(/^[⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏] - π - my-session - my-project$/);
-    await h.emit("agent_end");
-    expect(h.titles.at(-1)).toBe("π - my-session - my-project");
     const n = h.titles.length;
     await new Promise((r) => setTimeout(r, 200));
-    // Only the one re-apply after the run ends; no spinner, no polling.
-    expect(h.titles.length).toBeLessThanOrEqual(n + 1);
-    await h.emit("session_shutdown");
+    expect(h.titles.length).toBe(n);
+    await h.emit("agent_end");
+    expect(h.titles.at(-1)).toBe("π - my-session - my-project");
+    await new Promise((r) => setTimeout(r, 200));
+    // One re-apply after the run ends, then nothing.
+    expect(h.titles.length).toBeLessThanOrEqual(n + 2);
+  });
+
+  test("a config that still lists the removed spinner ignores it", async () => {
+    writeFileSync(
+      path.join(agentDir, "pi-status.json"),
+      JSON.stringify({ separator: " - ", components: [{ id: "spinner", enabled: true }] }),
+    );
+    const h = harness();
+    await h.emit("session_start");
+    expect(h.titles.at(-1)).toBe("π - my-session - my-project");
   });
 
   test("a session rename is picked up on the next tick", async () => {

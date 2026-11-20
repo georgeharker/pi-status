@@ -1,6 +1,6 @@
 # @thinkscape/pi-status
 
-A [pi](https://github.com/badlogic/pi-mono) extension that sets the terminal tab title from **configurable components** (session name, folder, model, git branch, current tool, …), with a spinner while the agent works.
+A [pi](https://github.com/badlogic/pi-mono) extension that sets the terminal tab title from **configurable components** (session name, folder, model, git branch, current tool, …). It rewrites the title only when something in it changes; for a busy indicator, use pi's terminal progress (below).
 
 For a progress indicator in the tab (OSC 9;4, e.g. in Ghostty), use pi's own setting: `"terminal": { "showTerminalProgress": true }` in pi's `settings.json`.
 
@@ -66,7 +66,6 @@ The order in the list determines the display order in the tab title. Changes are
 
 | Component ID    | Description                           | Default |
 |-----------------|---------------------------------------|---------|
-| `spinner`       | Progress spinner (⠋ ⠙ ⠹ ...)          | on      |
 | `pi_symbol`     | π symbol                              | on      |
 | `session`       | Session name                          | on      |
 | `cwd`           | Working directory basename            | on      |
@@ -103,7 +102,6 @@ Example with custom separator and additional components:
 {
   "separator": " | ",
   "components": [
-    { "id": "spinner", "enabled": true },
     { "id": "pi_symbol", "enabled": true },
     { "id": "model", "enabled": true },
     { "id": "session", "enabled": true },
@@ -118,7 +116,7 @@ Example with custom separator and additional components:
 }
 ```
 
-This would produce: `⠋ | π | claude-sonnet-4-5 | my-session | my-project | high | feat/config`
+This would produce: `π | claude-sonnet-4-5 | my-session | my-project | high | feat/config`
 
 ## Environment
 
