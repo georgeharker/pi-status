@@ -3,7 +3,7 @@
  * components show. The extension (index.ts) keeps the snapshot current from
  * pi's events; nothing here talks to pi.
  */
-import type { ComponentId, PiStatusConfig } from "./config.js";
+import type { ComponentId, PiTitleConfig } from "./config.js";
 
 /** What the components show. An empty string or null means "nothing", and
  *  that component is left out of the title. */
@@ -72,7 +72,7 @@ export function componentValue(id: ComponentId, s: TitleSnapshot): string {
 
 /** The enabled components with something to show, in order, joined by the
  *  separator. */
-export function buildTitle(config: PiStatusConfig, s: TitleSnapshot): string {
+export function buildTitle(config: PiTitleConfig, s: TitleSnapshot): string {
   return config.components
     .filter((c) => c.enabled)
     .map((c) => componentValue(c.id, s))

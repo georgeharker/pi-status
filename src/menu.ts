@@ -1,5 +1,5 @@
 /**
- * The /pi-status menus, built on pi's own settings components: a
+ * The /pi-title menus, built on pi's own settings components: a
  * SettingsList (as in pi's /settings) for the main menu, with submenus for
  * the components, the separator and reset. They reach the extension only
  * through MenuDeps.
@@ -45,7 +45,7 @@ export interface MenuDeps {
   /** Restore and save the default config. */
   reset(): void;
   enabled(): boolean;
-  /** Whether PI_STATUS_DISABLED turned pi-status off. */
+  /** Whether PI_TITLE_DISABLED (or PI_STATUS_DISABLED) turned pi-title off. */
   disabledByEnv(): boolean;
   setEnabled(enabled: boolean): void;
 }
@@ -155,14 +155,14 @@ function separatorInput(theme: Theme, deps: MenuDeps, done: (value?: string) => 
 const enabledCount = (deps: MenuDeps) => `${deps.components().filter((c) => c.enabled).length} on`;
 const statusValue = (deps: MenuDeps) => (deps.enabled() ? ON : deps.disabledByEnv() ? `${OFF} (${DISABLE_ENV})` : OFF);
 
-/** /pi-status: status, components, separator and reset in one settings list. */
+/** /pi-title: status, components, separator and reset in one settings list. */
 export async function showSettings(ctx: ExtensionCommandContext, deps: MenuDeps): Promise<void> {
   await ctx.ui.custom<void>((_tui, theme, _kb, done) => {
     const items: SettingItem[] = [
       {
         id: "status",
         label: "Status",
-        description: "Whether pi-status sets the terminal title",
+        description: "Whether pi-title sets the terminal title",
         currentValue: statusValue(deps),
         values: [ON, OFF],
       },
@@ -221,7 +221,7 @@ export async function showSettings(ctx: ExtensionCommandContext, deps: MenuDeps)
   });
 }
 
-/** /pi-status components: the picker on its own. */
+/** /pi-title components: the picker on its own. */
 export async function editComponents(ctx: ExtensionCommandContext, deps: MenuDeps): Promise<void> {
   await ctx.ui.custom<void>((_tui, theme, _kb, done) => componentPicker(theme, deps, () => done()));
   ctx.ui.notify("Component settings updated", "info");

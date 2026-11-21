@@ -1,9 +1,13 @@
 /**
- * pi-status configuration: the components and separator of the title, kept
- * in pi-status.json in pi's agent dir (pi's getAgentDir: PI_CODING_AGENT_DIR,
- * else ~/.pi/agent). That is the only file pi-status writes. A project's
- * .pi/pi-status.json, if present, is read instead (a per-project override,
+ * pi-title configuration: the components and separator of the title, kept
+ * in pi-title.json in pi's agent dir (pi's getAgentDir: PI_CODING_AGENT_DIR,
+ * else ~/.pi/agent). That is the only file pi-title writes. A project's
+ * .pi/pi-title.json, if present, is read instead (a per-project override,
  * never written). pi's own settings.json is never read or written.
+ *
+ * Earlier versions were named pi-status: a pi-status.json (global or
+ * project) is still read when there is no pi-title.json beside it, and
+ * PI_STATUS_DISABLED is honoured alongside PI_TITLE_DISABLED.
  */
 import path from "node:path";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -29,7 +33,7 @@ export interface ComponentConfig {
   enabled: boolean;
 }
 
-export interface PiStatusConfig {
+export interface PiTitleConfig {
   separator: string;
   components: ComponentConfig[];
 }
@@ -49,21 +53,23 @@ export const COMPONENT_LABELS: Record<ComponentId, string> = {
 
 const DEFAULT_ENABLED: ReadonlySet<ComponentId> = new Set(["pi_symbol", "session", "cwd"]);
 
-export const DEFAULT_CONFIG: PiStatusConfig = {
+export const DEFAULT_CONFIG: PiTitleConfig = {
   separator: " - ",
   components: ALL_COMPONENT_IDS.map((id) => ({ id, enabled: DEFAULT_ENABLED.has(id) })),
 };
 
-/** The longest separator /pi-status accepts. */
+/** The longest separator /pi-title accepts. */
 export const MAX_SEPARATOR_LENGTH = 5;
 
-/** Set to 1/true/yes/on to start with pi-status disabled. */
-export const DISABLE_ENV = "PI_STATUS_DISABLED";
+/** Set to 1/true/yes/on to start with pi-title disabled. */
+export const DISABLE_ENV = "PI_TITLE_DISABLED";
+/** The same, from when this was pi-status. */
+export const LEGACY_DISABLE_ENV = "PI_STATUS_DISABLED";
 
 const isComponentId = (id: unknown): id is ComponentId =>
   typeof id === "string" && (ALL_COMPONENT_IDS as readonly string[]).includes(id);
 
-/** A pi-status.json as read from disk, before it is checked. */
+/** A pi-title.json as read from disk, before it is checked. */
 export interface StoredConfig {
   separator?: unknown;
   components?: unknown;
@@ -73,7 +79,7 @@ export interface StoredConfig {
  *  is the default; unknown components (e.g. ones a later or earlier version
  *  had) are dropped; the stored order is kept, and components it leaves out
  *  are added at the end in their default state. */
-export function normalizeConfig(stored: StoredConfig | undefined): PiStatusConfig {
+export function normalizeConfig(stored: StoredConfig | undefined): PiTitleConfig {
   if (!stored) return structuredClone(DEFAULT_CONFIG);
   const separator = typeof stored.separator === "string" ? stored.separator : DEFAULT_CONFIG.separator;
   const listed = Array.isArray(stored.components) ? stored.components : [];
@@ -91,17 +97,22 @@ export function normalizeConfig(stored: StoredConfig | undefined): PiStatusConfi
 }
 
 export interface ConfigPaths {
-  /** <agent dir>/pi-status.json: read when there is no project file, and
+  /** <agent dir>/pi-title.json: read when there is no project file, and
    *  the only file written. */
   global: string;
-  /** <cwd>/.pi/pi-status.json: read in place of the global file. */
+  /** <cwd>/.pi/pi-title.json: read in place of the global file. */
   project: string;
+  /** The pi-status.json beside each, read when it is missing. */
+  legacyGlobal: string;
+  legacyProject: string;
 }
 
 export function configPaths(cwd: string = process.cwd(), agentDir: string = getAgentDir()): ConfigPaths {
   return {
-    global: path.join(agentDir, "pi-status.json"),
-    project: path.join(cwd, ".pi", "pi-status.json"),
+    global: path.join(agentDir, "pi-title.json"),
+    project: path.join(cwd, ".pi", "pi-title.json"),
+    legacyGlobal: path.join(agentDir, "pi-status.json"),
+    legacyProject: path.join(cwd, ".pi", "pi-status.json"),
   };
 }
 
@@ -119,17 +130,24 @@ function readStored(filePath: string): StoredConfig | undefined {
 
 /** The config in effect: the project file, else the global file, else the
  *  default; normalized. */
-export function loadConfig(paths: ConfigPaths = configPaths()): PiStatusConfig {
-  return normalizeConfig(readStored(paths.project) ?? readStored(paths.global));
+export function loadConfig(paths: ConfigPaths = configPaths()): PiTitleConfig {
+  return normalizeConfig(
+    readStored(paths.project) ??
+      readStored(paths.legacyProject) ??
+      readStored(paths.global) ??
+      readStored(paths.legacyGlobal),
+  );
 }
 
 /** Write `config` to the global file. */
-export function saveConfig(config: PiStatusConfig, paths: ConfigPaths = configPaths()): void {
+export function saveConfig(config: PiTitleConfig, paths: ConfigPaths = configPaths()): void {
   mkdirSync(path.dirname(paths.global), { recursive: true });
   writeFileSync(paths.global, JSON.stringify(config, null, 2) + "\n", "utf-8");
 }
 
 export function isDisabledByEnv(env: NodeJS.ProcessEnv = process.env): boolean {
-  const value = env[DISABLE_ENV]?.trim().toLowerCase();
-  return value === "1" || value === "true" || value === "yes" || value === "on";
+  return [DISABLE_ENV, LEGACY_DISABLE_ENV].some((name) => {
+    const value = env[name]?.trim().toLowerCase();
+    return value === "1" || value === "true" || value === "yes" || value === "on";
+  });
 }

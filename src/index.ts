@@ -1,5 +1,5 @@
 /**
- * pi-status: the terminal title, built from configurable components.
+ * pi-title: the terminal title, built from configurable components.
  *
  * pi's events keep a TitleSnapshot current; the title (title.ts) is a pure
  * function of it and the config (config.ts), set only when something in it
@@ -14,13 +14,13 @@ import {
   loadConfig,
   saveConfig,
   type ComponentConfig,
-  type PiStatusConfig,
+  type PiTitleConfig,
 } from "./config.js";
 import { EMPTY_SNAPSHOT, buildTitle, type TitleSnapshot } from "./title.js";
 import { editComponents, showSettings, type MenuDeps } from "./menu.js";
 
-export default function piStatus(pi: ExtensionAPI) {
-  let config: PiStatusConfig = loadConfig();
+export default function piTitle(pi: ExtensionAPI) {
+  let config: PiTitleConfig = loadConfig();
   let enabled = !isDisabledByEnv();
   let destroyed = false;
   /** Whether the agent is working (the turn component shows only then). */
@@ -80,7 +80,7 @@ export default function piStatus(pi: ExtensionAPI) {
     seen.gitBranch = result?.code === 0 ? result.stdout.trim() : "";
   }
 
-  /** Turn pi-status on or off for this session. Off leaves the title to pi's
+  /** Turn pi-title on or off for this session. Off leaves the title to pi's
    *  own format on its next update. */
   function setEnabled(ctx: ExtensionContext, on: boolean): void {
     enabled = on;
@@ -160,7 +160,7 @@ export default function piStatus(pi: ExtensionAPI) {
     destroyed = true;
   });
 
-  // ── /pi-status ────────────────────────────────────────────────────────
+  // ── /pi-title ────────────────────────────────────────────────────────
 
   const menuDeps = (ctx: ExtensionCommandContext): MenuDeps => ({
     components: () => config.components,
@@ -212,7 +212,7 @@ export default function piStatus(pi: ExtensionAPI) {
 
   async function reset(ctx: ExtensionCommandContext): Promise<void> {
     const ok = await ctx.ui.confirm(
-      "Reset pi-status config?",
+      "Reset pi-title config?",
       "This restores the default title components and separator. Continue?",
     );
     if (!ok) {
@@ -220,10 +220,10 @@ export default function piStatus(pi: ExtensionAPI) {
       return;
     }
     menuDeps(ctx).reset();
-    ctx.ui.notify("pi-status config reset to defaults", "info");
+    ctx.ui.notify("pi-title config reset to defaults", "info");
   }
 
-  pi.registerCommand("pi-status", {
+  pi.registerCommand("pi-title", {
     description:
       "Configure the terminal title. Subcommands: on, off, components, separator, reset. " +
       "No argument shows a menu.",
@@ -232,10 +232,10 @@ export default function piStatus(pi: ExtensionAPI) {
       switch (args.trim().toLowerCase().split(/\s+/)[0]) {
         case "on":
           setEnabled(ctx, true);
-          return ctx.ui.notify("pi-status enabled", "info");
+          return ctx.ui.notify("pi-title enabled", "info");
         case "off":
           setEnabled(ctx, false);
-          return ctx.ui.notify("pi-status disabled", "info");
+          return ctx.ui.notify("pi-title disabled", "info");
         case "components":
           return editComponents(ctx, menuDeps(ctx));
         case "separator":
@@ -251,5 +251,5 @@ export default function piStatus(pi: ExtensionAPI) {
 }
 
 // For config consumers.
-export { loadConfig as readPiStatusConfig, DEFAULT_CONFIG, ALL_COMPONENT_IDS, COMPONENT_LABELS } from "./config.js";
-export type { PiStatusConfig, ComponentConfig, ComponentId } from "./config.js";
+export { loadConfig as readPiTitleConfig, DEFAULT_CONFIG, ALL_COMPONENT_IDS, COMPONENT_LABELS } from "./config.js";
+export type { PiTitleConfig, ComponentConfig, ComponentId } from "./config.js";
