@@ -1,29 +1,32 @@
 {
-  "name": "@thinkscape/pi-status",
-  "version": "0.3.6",
-  "description": "Configurable, auto-updating terminal title for pi coding agent.",
+  "name": "@geohar/pi-title",
+  "version": "0.4.0",
+  "description": "Configurable terminal title for the pi coding agent: session, folder, model, git branch, current tool and more.",
   "type": "module",
   "packageManager": "bun@1.3.9",
-  "author": "Thinkscape",
-  "homepage": "https://github.com/Thinkscape/pi-status#readme",
+  "author": "George Harker <george@georgeharker.com>",
+  "homepage": "https://github.com/georgeharker/pi-title#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Thinkscape/pi-status.git"
+    "url": "git+https://github.com/georgeharker/pi-title.git"
   },
   "bugs": {
-    "url": "https://github.com/Thinkscape/pi-status/issues"
+    "url": "https://github.com/georgeharker/pi-title/issues"
   },
   "keywords": [
     "pi-package",
     "pi-extension",
+    "pi-coding-agent",
     "terminal",
-    "status",
-    "spinner"
+    "title",
+    "tab-title"
   ],
   "license": "MIT",
   "files": [
     "src",
-    "README.md"
+    "!src/**/*.test.ts",
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
     "check": "tsc --noEmit",
@@ -34,13 +37,13 @@
     "release:patch": "bun run scripts/release.ts patch",
     "release:minor": "bun run scripts/release.ts minor",
     "release:major": "bun run scripts/release.ts major",
-    "pack:dry-run": "npm pack --dry-run"
+    "pack:dry-run": "npm pack --dry-run",
+    "prepublishOnly": "bun run check && bun test"
   },
   "pi": {
     "extensions": [
       "./src/index.ts"
-    ],
-    "image": "https://raw.githubusercontent.com/Thinkscape/pi-status/main/assets/demo.gif"
+    ]
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": ">=0.84.4",
@@ -52,5 +55,11 @@
     "@types/bun": "^1.3.13",
     "@types/node": "25.6.0",
     "typescript": "6.0.3"
+  },
+  "contributors": [
+    "Thinkscape (original pi-status)"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }

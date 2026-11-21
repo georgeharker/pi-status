@@ -1,103 +1,88 @@
-# @thinkscape/pi-status
+# pi-title
 
-A [pi](https://github.com/badlogic/pi-mono) extension that sets the terminal tab title from **configurable components** (session name, folder, model, git branch, current tool, …). It rewrites the title only when something in it changes; for a busy indicator, use pi's terminal progress (below).
+A [pi](https://pi.dev) extension that sets your terminal's tab title from parts you
+choose: session name, folder, model, thinking level, git branch, the tool running now,
+and a few more. It changes the title only when one of those parts changes.
 
-For a progress indicator in the tab (OSC 9;4, e.g. in Ghostty), use pi's own setting: `"terminal": { "showTerminalProgress": true }` in pi's `settings.json`.
+```text
+π - fix-login-redirect - my-project
+π | claude-opus-5-5 | my-session | my-project | high | feat/config
+```
 
-![Demo](assets/demo.gif)
+It does not show whether pi is busy. pi can already show that as a progress indicator
+in the tab (OSC 9;4, which Ghostty and some other terminals support). Turn it on in
+pi's `settings.json`:
+
+```json
+{ "terminal": { "showTerminalProgress": true } }
+```
 
 ## Install
 
 ```bash
-pi install @thinkscape/pi-status
+pi install npm:@geohar/pi-title
 ```
 
-Or test it for one run:
+Or try it for one run:
 
 ```bash
-pi -e @thinkscape/pi-status
+pi -e npm:@geohar/pi-title
 ```
-
-## Screenshots
-
-### Main menu (`/pi-status`)
-
-![Main menu](assets/screenshot-menu.png)
-
-### Component picker (`/pi-status components`)
-
-![Component picker](assets/screenshot-components.png)
-
 
 ## Commands
 
-Typing `/pi-status` with no arguments opens its settings, in the same style as pi's `/settings`:
+`/pi-title` opens a settings list, in the same style as pi's `/settings`:
 
-- **Status** — enabled/disabled (Enter/Space cycles it)
-- **Components** — opens the component picker
-- **Separator** — type a new separator (Enter on an empty field keeps the current one)
-- **Reset to defaults** — restore the default config, after a confirmation
+- **Status**: on or off for this session (Enter or Space switches it)
+- **Components**: what the title shows and in what order
+- **Separator**: the text placed between components
+- **Reset to defaults**: asks before restoring the default components and separator
 
-Esc closes a submenu, then the settings.
+Esc closes a submenu, then the list.
 
-You can also invoke subcommands directly:
+Each part can also be opened directly:
 
 ```text
-/pi-status                open the settings
-/pi-status status         open the settings
-/pi-status on             enable pi-status for this session
-/pi-status off            disable pi-status for this session
-/pi-status components     open TUI to toggle & reorder status components
-/pi-status separator      change the separator character between elements
-/pi-status reset          restore default pi-status configuration
+/pi-title              open the settings
+/pi-title on           turn the title on for this session
+/pi-title off          turn it off; pi's own title comes back on its next update
+/pi-title components   choose and reorder components
+/pi-title separator    change the separator (up to 5 characters)
+/pi-title reset        restore the defaults
 ```
 
-### `components` TUI
+### Components
 
-Opens an interactive picker with a **live preview** of the current title at the top. You can:
+The picker shows a live preview of the title above the list.
 
-- **Toggle** components on/off with `Enter` or `Space`
-- **Reorder** components with `Ctrl+↑` / `Ctrl+↓`
-- **Navigate** the list with `↑` / `↓`
-- **Exit** with `Escape`, which saves
+- `↑` / `↓` move through the list
+- `Enter` / `Space` turns a component on or off
+- `Ctrl+↑` / `Ctrl+↓` moves it up or down (the title follows the list's order)
+- `Esc` saves and closes
 
-The order in the list determines the display order in the tab title. Changes show in the title as you make them.
+| ID             | Shows                                        | Default |
+|----------------|----------------------------------------------|---------|
+| `pi_symbol`    | π                                            | on      |
+| `session`      | Session name                                 | on      |
+| `cwd`          | Working directory's folder name              | on      |
+| `model`        | Current model                                | off     |
+| `thinking`     | Thinking level                               | off     |
+| `tokens`       | Context token usage                          | off     |
+| `turn`         | Turn number, while the agent is working      | off     |
+| `git_branch`   | Current git branch                           | off     |
+| `tools_count`  | Number of active tools                       | off     |
+| `current_tool` | The tool running right now                   | off     |
 
-### Available components
-
-| Component ID    | Description                           | Default |
-|-----------------|---------------------------------------|---------|
-| `pi_symbol`     | π symbol                              | on      |
-| `session`       | Session name                          | on      |
-| `cwd`           | Working directory basename            | on      |
-| `model`         | Current model (e.g., `claude-sonnet-4-5`) | off  |
-| `thinking`      | Thinking level (e.g., `high`)         | off     |
-| `tokens`        | Context token usage                   | off     |
-| `turn`          | Current turn number                   | off     |
-| `git_branch`    | Current git branch name               | off     |
-| `tools_count`   | Number of active tools                | off     |
-| `current_tool`  | Currently executing tool name         | off     |
-
-### `separator`
-
-Prompts for a new separator string (max 5 characters). The separator is placed between each enabled component.
-
-Default: `" - "`
-
-### `reset`
-
-Restores all pi-status configuration to the defaults shown above.
+The default separator is `" - "`.
 
 ## Configuration
 
-Settings are stored in their own file, `pi-status.json`, in pi's agent dir:
+The settings live in their own file, never in pi's `settings.json`:
 
-- `~/.pi/agent/pi-status.json` (global; in `$PI_CODING_AGENT_DIR` when that is set). This is the only file `/pi-status` writes.
-- `.pi/pi-status.json` (project-local, read instead of the global file; never written)
-
-pi's own `settings.json` is never read or written. A config from an older version (a `piStatus` key in pi's `settings.json`) can be moved by hand: its value is the contents of `pi-status.json`.
-
-Example with custom separator and additional components:
+- `~/.pi/agent/pi-title.json` (in `$PI_CODING_AGENT_DIR` when that is set). This is the
+  only file `/pi-title` writes.
+- `.pi/pi-title.json` in a project. When present it is read instead of the global file.
+  You edit it by hand.
 
 ```json
 {
@@ -108,45 +93,52 @@ Example with custom separator and additional components:
     { "id": "session", "enabled": true },
     { "id": "cwd", "enabled": true },
     { "id": "thinking", "enabled": true },
-    { "id": "git_branch", "enabled": true },
-    { "id": "tokens", "enabled": false },
-    { "id": "turn", "enabled": false },
-    { "id": "tools_count", "enabled": false },
-    { "id": "current_tool", "enabled": false }
+    { "id": "git_branch", "enabled": true }
   ]
 }
 ```
 
-This would produce: `π | claude-sonnet-4-5 | my-session | my-project | high | feat/config`
+Components you leave out are added after the ones you list, in their default state.
 
-## Environment
-
-Disable the extension by default:
+To start pi with the title turned off:
 
 ```bash
-PI_STATUS_DISABLED=1 pi
+PI_TITLE_DISABLED=1 pi
 ```
 
-Accepted truthy values are `1`, `true`, `yes`, and `on`.
+`1`, `true`, `yes` and `on` all count.
+
+### Coming from pi-status
+
+pi-title began as a fork of pi-status. If you used pi-status, your settings carry over:
+a `pi-status.json` is read when there is no `pi-title.json` next to it, and
+`PI_STATUS_DISABLED` still works. The first change you save goes to `pi-title.json`.
+Uninstall `@thinkscape/pi-status` so the two don't both set the title.
+
+## Credits
+
+pi-title is based on [pi-status](https://github.com/Thinkscape/pi-status) by
+[Thinkscape](https://github.com/Thinkscape), MIT licensed. It keeps pi-status's
+title components and its component picker. It drops the spinner and the
+Ghostty-specific code, because pi now shows progress itself. It also moves the settings
+out of pi's `settings.json` into their own file, and rebuilds the menu on pi's settings
+components.
 
 ## Development
 
 ```bash
 bun install
-bun run check
+bun run check   # tsc
+bun test
 ```
 
 ## Releasing
 
 ```bash
-# Bump version only (patch/minor/major)
-bun run version:patch
-
-# Full release: check → bump → commit → tag
-bun run release:patch
-
-# Then push the tag to trigger GitHub Actions auto-publish:
+bun run release:patch   # check, bump, commit, tag (also :minor / :major)
 git push origin main --tags
 ```
 
-CI runs on every PR (`bun run check` + dry-run pack). Tag pushes trigger the publish workflow to npm.
+Pushing a `v*` tag publishes to npm through trusted publishing and creates a GitHub
+release. CI runs the type check, the tests and a dry-run pack on every push and pull
+request.
